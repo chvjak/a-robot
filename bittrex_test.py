@@ -1,6 +1,5 @@
 from bittrex import bittrex
-exchange = bittrex("3d67ccf43be1415094a18f625a82ced1", "825725094abf448a96cf6864f4047dfc")
-
+exchange = bittrex("286302f8d49f48b5b147418f193765c8", "328bb9193d324e918aec08dc0c814728")
 
 # get 0.1 btc for X usd priced as 10 usd per btc
 order = exchange.create_order("USDT", "BTC", 0.1, 10)

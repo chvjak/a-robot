@@ -18,19 +18,46 @@ ACCOUNT_SET = {'getorder', 'getbalances', 'getbalance', 'getdepositaddress', 'wi
 # https://github.com/ericsomdahl/python-bittrex/blob/master/bittrex/bittrex.py
 # https://bittrex.com/home/api
 
+def myhash(*args):
+    res = ""
+    for a in args:
+        res += a.__str__()
+
+    return res
+
+def aging_cache_result(max_age):
+    def cache_result(func):
+        cache = {}
+        def wrapper(*args):
+            hash = myhash(args)
+            if hash in cache:
+                time_stamp, result = cache[hash]
+                if time.time() - time_stamp < max_age:
+                    return result
+
+            t, res = time.time(), func(*args)
+            cache[hash]  = (t, res)
+            return res
+        return wrapper
+    return cache_result
+
 
 class bittrex:
     def __init__(self, api_key, api_secret):
         self.api_key = str(api_key) if api_key is not None else ''
         self.api_secret = str(api_secret) if api_secret is not None else ''
 
-        self.direct_pairs = ['USDT-BTC', 'BTC-ETH', 'USDT-ETH', 'USDT-ZEC', 'ETH-ZEC', 'ETH-DASH', 'BTC-DASH', 'USDT-DASH', 'ETH-XRP', 'BTC-XRP', 'USDT-XRP']
+        self.coin_separator = '-'
+        self.direct_pairs = ['USDT-BTC', 'BTC-ETH', 'USDT-ETH', 'USDT-ZEC', 'ETH-ZEC', 'ETH-DASH', 'BTC-DASH', 'USDT-DASH', 'ETH-XRP', 'BTC-XRP', 'USDT-XRP', 'BTC-LTC', 'ETH-LTC', 'USDT-LTC']
+        self.quotes = ['empty quotes']
 
+    def update_quotes(self):
+      ...
 
     def api_query(self, command, req={}):
 
         if (command == "returnOrderBook"):
-            ret = requests.get('https://bittrex.com/api/v1.1/public/getorderbook?type=both&depth=1&market=' + str(req['currencyPair']))
+            ret = requests.get('https://bittrex.com/api/v1.1/public/getorderbook?market=' + str(req['currencyPair'] + '&type=both'))
 
             return ret.json()
         else:
@@ -72,24 +99,44 @@ class bittrex:
     def returnOrderBook(self, currencyPair):
         return self.api_query("returnOrderBook", {'currencyPair': currencyPair})
 
-    def order_book_top1(self, from_coin, to_coin):
+    def returnOrderBookCached(self, currencyPair):
+        return self.quotes[currencyPair]
+
+    def order_book_top10(self, from_coin, to_coin):
         # {'asks': [['2529.04989980', 100]], 'bids': [['2529.04989980', 200]]}
 
         currency_pair = "-".join([from_coin, to_coin])
         if currency_pair in self.direct_pairs:
             res = self.returnOrderBook(currency_pair)
-            res1 = res['result']['buy'][0]
+            res1 = res['result']['sell'][0]
             price, volume = res1['Rate'], res1['Quantity']
             price = float(price)
             return {'price': float(price), 'volume': volume}
         else:
             currency_pair = "-".join([to_coin, from_coin])
             res = self.returnOrderBook(currency_pair)
-            res1= res['result']['sell'][0]
+            res1 = res['result']['buy'][0]
             price, volume = res1['Rate'], res1['Quantity']
             price = float(price)
             return {'price': 1.0 / price, 'volume': volume * price}
 
+    def order_book_top1(self, from_coin, to_coin):
+        # {'asks': [['2529.04989980', 100]], 'bids': [['2529.04989980', 200]]}
+
+        currency_pair = "-".join([from_coin, to_coin])
+        if currency_pair in self.direct_pairs:
+            res = self.returnOrderBookCached(currency_pair)
+            res1 = res['result']['sell'][0]
+            price, volume = res1['Rate'], res1['Quantity']
+            price = float(price)
+            return {'price': float(price), 'volume': volume}
+        else:
+            currency_pair = "-".join([to_coin, from_coin])
+            res = self.returnOrderBookCached(currency_pair)
+            res1 = res['result']['buy'][0]
+            price, volume = res1['Rate'], res1['Quantity']
+            price = float(price)
+            return {'price': 1.0 / price, 'volume': volume * price}
 
 
     def create_order(self, from_coin, to_coin, volume, price):
@@ -226,7 +273,9 @@ class bittrex:
         return self.api_query('getopenorders', {'market': market})
 
     def get_order(self, uuid):
-        return self.api_query1('getorder', {'uuid': uuid})
+        order = self.api_query1('getorder', {'uuid': uuid})
+        print(order)
+        return order
 
     def is_order_open(self, uuid):
         order = self.get_order(uuid)
