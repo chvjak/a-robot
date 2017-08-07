@@ -74,40 +74,5 @@ class poloniex:
             price = float(price)
             return {'price': 1.0 / price, 'volume': volume * price}
 
-    # Returns all of your balances.
-    # Outputs:
-    # {"BTC":"0.59098578","LTC":"3.31117268", ... }
-    def returnBalances(self):
-        return self.api_query('returnBalances')
 
-    # Returns your open orders for a given market, specified by the "currencyPair" POST parameter, e.g. "BTC_XCP"
-    # Inputs:
-    # currencyPair  The currency pair e.g. "BTC_XCP"
-    # Outputs:
-    # orderNumber   The order number
-    # type          sell or buy
-    # rate          Price the order is selling or buying at
-    # Amount        Quantity of order
-    # total         Total value of order (price * quantity)
-    def returnOpenOrders(self, currencyPair):
-        return self.api_query('returnOpenOrders', {"currencyPair": currencyPair})
-
-    # Places a buy order in a given market. Required POST parameters are "currencyPair", "rate", and "amount". If successful, the method will return the order number.
-    # Inputs:
-    # currencyPair  The curreny pair
-    # rate          price the order is buying at
-    # amount        Amount of coins to buy
-    # Outputs:
-    # orderNumber   The order number
-    def buy(self, currencyPair, rate, amount):
-        if currencyPair in direct_pairs:
-            return self.api_query('buy', {"currencyPair": currencyPair, "rate": rate, "amount": amount})
-        elif currencyPair in reversed_pairs:
-            return self.api_query('sell', {"currencyPair": currencyPair, "rate": rate, "amount": amount})
-
-
-    # Outputs:
-    # succes        1 or 0
-    def cancel(self, currencyPair, orderNumber):
-        return self.api_query('cancelOrder', {"currencyPair": currencyPair, "orderNumber": orderNumber})
 
