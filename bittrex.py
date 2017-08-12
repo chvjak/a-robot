@@ -15,7 +15,7 @@ BASE_URL = 'https://bittrex.com/api/v1.1/%s/'
 MARKET_SET = {'getopenorders', 'cancel', 'sellmarket', 'selllimit', 'buymarket', 'buylimit'}
 ACCOUNT_SET = {'getorder', 'getbalances', 'getbalance', 'getdepositaddress', 'withdraw', 'getorderhistory'}
 
-HTTP_TIMEOUT = None
+HTTP_TIMEOUT = 2
 # https://github.com/ericsomdahl/python-bittrex/blob/master/bittrex/bittrex.py
 # https://bittrex.com/home/api
 
@@ -34,8 +34,7 @@ class bittrex:
 
         if (command == "returnOrderBook"):
             try:
-                #ret = requests.get('https://bittrex.com/api/v1.1/public/getorderbook?market=' + str(req['currencyPair'] + '&type=both'), timeout=HTTP_TIMEOUT)
-                ret = requests.get('https://bittrex.com/api/v1.1/public/getorderbook?market=' + str(req['currencyPair'] + '&type=both'))
+                ret = requests.get('https://bittrex.com/api/v1.1/public/getorderbook?market=' + str(req['currencyPair'] + '&type=both'), timeout=HTTP_TIMEOUT)
 
                 return ret.json()
             except:
@@ -66,10 +65,11 @@ class bittrex:
         try:
             return requests.get(
                 request_url,
-                headers={"apisign": hmac.new(self.api_secret.encode(), request_url.encode(), hashlib.sha512).hexdigest()}
+                headers={"apisign": hmac.new(self.api_secret.encode(), request_url.encode(), hashlib.sha512).hexdigest()},
+                timeout=HTTP_TIMEOUT
             ).json()
 
-        #                timeout=HTTP_TIMEOUT
+
 
         except:
             print("ERROR CONNECTING TO EXCHANGE")
@@ -78,7 +78,8 @@ class bittrex:
 
     def returnOrderBook(self, currencyPair):
         res = self.api_query("returnOrderBook", {'currencyPair': currencyPair})
-        res['time'] = time.time()
+        if res is not None:
+            res['time'] = time.time()
         return res
 
     def returnOrderBookCached(self, currencyPair):
@@ -230,7 +231,11 @@ class bittrex:
 
     def is_order_open(self, uuid):
         order = self.get_order(uuid)
-        return order["result"]["IsOpen"]
+        if order is not None:
+            return order["result"]["IsOpen"]
+        else:
+            return True
+
 
     def order_remaining_amount(self, uuid):
         exchange_order = self.get_order(uuid)['result']

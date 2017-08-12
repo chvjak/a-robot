@@ -17,7 +17,7 @@ class config:
         tx        = 0.0025
         eps       = 0.000000001
         max_loss  = -0.1
-        cooldown_time = 30
+        cooldown_time = 5
         min_trade_btc = 0.0005
         trade_vol_percent_min = 5
         ob_max_age_delta = 3
@@ -283,12 +283,21 @@ if __name__ == '__main__':
     max_arb_execution_time = 0
     sum_arb_execution_time = 0
 
+    sum_ob_dl_time = 0
+    ob_dl_count = 0
     print(strftime("%H:%M:%S", localtime()))
     while 1:
         pairs = get_relevant_pairs(exchange, arbitrage_coins)
+
+        dl_start_time = time()
         exchange.quotes = dict(zip(pairs, pool.map(exchange.returnOrderBook, pairs)))
+        ob_dl_count += 1
+        sum_ob_dl_time += (time() - dl_start_time)
 
         if any(x is None for x in exchange.quotes.values()):
+            sum_ob_dl_time = 0
+            ob_dl_count = 0
+
             print("Cooling down")
             sleep(config.cooldown_time)
             continue
@@ -300,6 +309,12 @@ if __name__ == '__main__':
                 continue
             else:
                 print('.', end='', flush=True)
+
+            if ob_dl_count == 250:
+                print(':%f sec' % (sum_ob_dl_time / ob_dl_count))
+                sum_ob_dl_time = 0
+                ob_dl_count = 0
+
 
         arb1 = convert(convert(convert(config.test_vol, from_coin=arbitrage_coins[0], to_coin=arbitrage_coins[1]), from_coin=arbitrage_coins[1], to_coin=arbitrage_coins[2]), from_coin=arbitrage_coins[2], to_coin=arbitrage_coins[0]) - config.test_vol
         arb2 = convert(convert(convert(config.test_vol, from_coin=arbitrage_coins[0], to_coin=arbitrage_coins[2]), from_coin=arbitrage_coins[2], to_coin=arbitrage_coins[1]), from_coin=arbitrage_coins[1], to_coin=arbitrage_coins[0]) - config.test_vol
