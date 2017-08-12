@@ -15,6 +15,7 @@ BASE_URL = 'https://bittrex.com/api/v1.1/%s/'
 MARKET_SET = {'getopenorders', 'cancel', 'sellmarket', 'selllimit', 'buymarket', 'buylimit'}
 ACCOUNT_SET = {'getorder', 'getbalances', 'getbalance', 'getdepositaddress', 'withdraw', 'getorderhistory'}
 
+HTTP_TIMEOUT = None
 # https://github.com/ericsomdahl/python-bittrex/blob/master/bittrex/bittrex.py
 # https://bittrex.com/home/api
 
@@ -25,7 +26,7 @@ class bittrex:
         self.api_secret = str(api_secret) if api_secret is not None else ''
 
         self.coin_separator = '-'
-        self.direct_pairs = ['USDT-BTC', 'BTC-ETH', 'USDT-ETH', 'USDT-ZEC', 'ETH-ZEC', 'ETH-DASH', 'BTC-DASH', 'USDT-DASH', 'ETH-XRP', 'BTC-XRP', 'USDT-XRP', 'BTC-LTC', 'ETH-LTC', 'USDT-LTC', 'BTC-BCC', 'ETH-BCC', 'USDT-BCC' ]
+        self.direct_pairs = ['USDT-BTC', 'BTC-ETH', 'USDT-ETH', 'USDT-ZEC', 'ETH-ZEC', 'ETH-DASH', 'BTC-DASH', 'USDT-DASH', 'ETH-XRP', 'BTC-XRP', 'USDT-XRP', 'BTC-LTC', 'ETH-LTC', 'USDT-LTC', 'BTC-BCC', 'ETH-BCC', 'USDT-BCC', 'BTC-NEO','USDT-NEO', 'BTC-XMR','USDT-XMR' ]
         self.quotes = ['empty quotes']
         self.order_log = {}
 
@@ -33,6 +34,7 @@ class bittrex:
 
         if (command == "returnOrderBook"):
             try:
+                #ret = requests.get('https://bittrex.com/api/v1.1/public/getorderbook?market=' + str(req['currencyPair'] + '&type=both'), timeout=HTTP_TIMEOUT)
                 ret = requests.get('https://bittrex.com/api/v1.1/public/getorderbook?market=' + str(req['currencyPair'] + '&type=both'))
 
                 return ret.json()
@@ -67,13 +69,17 @@ class bittrex:
                 headers={"apisign": hmac.new(self.api_secret.encode(), request_url.encode(), hashlib.sha512).hexdigest()}
             ).json()
 
+        #                timeout=HTTP_TIMEOUT
+
         except:
             print("ERROR CONNECTING TO EXCHANGE")
             print(request_url)
             return None
 
     def returnOrderBook(self, currencyPair):
-        return self.api_query("returnOrderBook", {'currencyPair': currencyPair})
+        res = self.api_query("returnOrderBook", {'currencyPair': currencyPair})
+        res['time'] = time.time()
+        return res
 
     def returnOrderBookCached(self, currencyPair):
         return self.quotes[currencyPair]
@@ -104,18 +110,15 @@ class bittrex:
             price = float(price)
             return {'price': 1.0 / price, 'volume': volume} # eth => btc: btc-eth => price in eth, volume in eth
 
-    def order_book_aggregated_top1(self, from_coin, to_coin, min_trade):
-        '''
-
-        :param from_coin:
-        :param to_coin:
-        :param min_trade: must be expressed in to_coin
-        :return:
-        '''
+    def order_book_aggregated_top1(self, from_coin, to_coin, min_trade, cached = True):
+        if cached:
+            ob_func = self.returnOrderBookCached
+        else:
+            ob_func = self.returnOrderBook
 
         currency_pair = "-".join([from_coin, to_coin])
         if currency_pair in self.direct_pairs:
-            res = self.returnOrderBookCached(currency_pair)
+            res = ob_func(currency_pair)
             volume = 0
             i = 0
             while volume < min_trade:
@@ -126,7 +129,7 @@ class bittrex:
             return {'price': price, 'volume': volume}       # usdt => eth : usdt-eth => price in usdt, volume in usdt
         else:
             currency_pair = "-".join([to_coin, from_coin])
-            res = self.returnOrderBookCached(currency_pair)
+            res = ob_func(currency_pair)
             self.quotes[currency_pair] = res
             volume = 0
             i = 0
@@ -154,7 +157,6 @@ class bittrex:
 
         if res["success"]:
             o_id = res["result"]["uuid"]
-            #o_id = res["result"]["OrderUuid"]
 
             # could also store actual amounts for further PL calculations, also time could be useful to benchmark ordr execution time, and freqs of arb ops
             self.order_log[o_id] = {"CurrencyPair": "-".join([from_coin, to_coin])}
@@ -223,7 +225,7 @@ class bittrex:
 
     def get_order(self, uuid):
         order = self.api_query1('getorder', {'uuid': uuid})
-        print(order)
+        #print(order)
         return order
 
     def is_order_open(self, uuid):
