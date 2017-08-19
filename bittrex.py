@@ -10,6 +10,11 @@ except ImportError:
     from urllib.parse import urlencode
     from urllib.parse import urljoin
 
+from log import Log
+
+log = Log()
+
+
 BASE_URL = 'https://bittrex.com/api/v1.1/%s/'
 
 MARKET_SET = {'getopenorders', 'cancel', 'sellmarket', 'selllimit', 'buymarket', 'buylimit'}
@@ -49,7 +54,7 @@ class bittrex:
 
                 return ret.json()
             except:
-                print("|")
+                print("|", end='')
                 return None
         elif (command == "returnMarketHistory"):
             try:
@@ -57,7 +62,7 @@ class bittrex:
 
                 return ret.json()
             except:
-                print("&")
+                print("&", end='')
                 return None
         else:
             return ""
@@ -91,8 +96,8 @@ class bittrex:
 
 
         except:
-            print("ERROR CONNECTING TO EXCHANGE")
-            print(request_url)
+            log("ERROR CONNECTING TO EXCHANGE")
+            log(request_url)
             return None
 
     def returnOrderBook(self, currencyPair):
@@ -119,7 +124,7 @@ class bittrex:
             volume = 0
             i = 0
             max_i = len(res['result']['sell'])
-            while volume < min_trade and i < max_i:
+            while volume <= min_trade and i < max_i:
                 res1 = res['result']['sell'][i]
                 price = float(res1['Rate'])                 # 2DO: MAX price is used instead of WEIGHTED
                 volume += float(res1['Quantity']) * price
@@ -139,7 +144,7 @@ class bittrex:
             volume = 0
             i = 0
             max_i = len(res['result']['buy'])
-            while volume < min_trade  and i < max_i:
+            while volume <= min_trade  and i < max_i:
                 res1 = res['result']['buy'][i]
                 price = float(res1['Rate'])                # 2DO: MAX price is used instead of WEIGHTED
                 volume += float(res1['Quantity'])
@@ -167,7 +172,7 @@ class bittrex:
             res = self.sell_limit(currency_pair, rvolume, rprice)
 
 
-        if res["success"]:
+        if res is not None and res["success"]:
             o_id = res["result"]["uuid"]
 
             # could also store actual amounts for further PL calculations, also time could be useful to benchmark ordr execution time, and freqs of arb ops
@@ -175,17 +180,17 @@ class bittrex:
 
             return o_id
         else:
-            print(res)
+            log(res)
 
-            print("FAILED TO CREATE ORDER FOR CONVERSION FROM %s TO %f %s USING PRICE %f" % (from_coin, volume, to_coin, price))
+            log("FAILED TO CREATE ORDER FOR CONVERSION FROM %s TO %f %s USING PRICE %f" % (from_coin, volume, to_coin, price))
             return -1
 
     def buy_limit(self, market, quantity, rate):
-        print('buylimit', {'market': market, 'quantity': quantity, 'rate': rate})
+        log("{} {}".format('buylimit', {'market': market, 'quantity': quantity, 'rate': rate}))
         return self.api_query1('buylimit', {'market': market, 'quantity': quantity, 'rate': rate})
 
     def sell_limit(self, market, quantity, rate):
-        print('selllimit', {'market': market, 'quantity': quantity, 'rate': rate})
+        log("{} {}".format('selllimit', {'market': market, 'quantity': quantity, 'rate': rate}))
         return self.api_query1('selllimit', {'market': market, 'quantity': quantity, 'rate': rate})
 
     def cancel_order(self, uuid):
@@ -198,8 +203,7 @@ class bittrex:
         if res["success"]:
             return True
         else:
-            #print(res)
-            print("FAILED TO CANCEL ORDER %s" % (uuid))
+            log("FAILED TO CANCEL ORDER %s" % (uuid))
 
             return False
 
@@ -241,19 +245,22 @@ class bittrex:
 
         return res
 
-    def get_market_vol(self, currency_pair):
+    def get_market_volatility(self, currency_pair):
         res = self.get_market_history(currency_pair)
         if res is not None:
             history = res['result']
+
 
             time0 = ts_2_s(history[0]['TimeStamp'])
             prices = [h['Price'] for h in history if (time0 - ts_2_s(h['TimeStamp'])) < 100]
             max_p = max(prices)
             norm_prices = [p / max_p for p in prices]
 
+            sum_amount = sum([h['Quantity'] for h in history if (time0 - ts_2_s(h['TimeStamp'])) < 100])
+
             avg_p = sum(norm_prices) / len(norm_prices)
             vol = (sum((p - avg_p) ** 2 for p in norm_prices)) ** 0.5
-            return vol
+            return (vol, len(norm_prices), sum_amount)
         else:
             return None
 
