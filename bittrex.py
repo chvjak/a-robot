@@ -43,7 +43,8 @@ class bittrex:
         self.order_log = {}
 
 
-    def api_query(self, command, req={}):
+    # PUBLIC API FUNCTIONS
+    def api_query_public(self, command, req={}):
         '''
         Public API
         '''
@@ -67,42 +68,9 @@ class bittrex:
         else:
             return ""
 
-    def api_query1(self, method, options=None):
-        '''
-        Private API
-        '''
-        if not options:
-            options = {}
-        nonce = str(int(time.time() * 1000))
-
-        if method in MARKET_SET:
-            method_set = 'market'
-        elif method in ACCOUNT_SET:
-            method_set = 'account'
-
-        request_url = (BASE_URL % method_set) + method + '?'
-
-        request_url += 'apikey=' + self.api_key + "&nonce=" + nonce + '&'
-
-        request_url += urlencode(options)
-
-        try:
-            return requests.get(
-                request_url,
-                headers={"apisign": hmac.new(self.api_secret.encode(), request_url.encode(), hashlib.sha512).hexdigest()},
-                timeout=HTTP_TIMEOUT
-            ).json()
-
-
-
-        except:
-            log("ERROR CONNECTING TO EXCHANGE")
-            log(request_url)
-            return None
-
     def returnOrderBook(self, currencyPair):
         while True:
-            res = self.api_query("returnOrderBook", {'currencyPair': currencyPair})
+            res = self.api_query_public("returnOrderBook", {'currencyPair': currencyPair})
             if res is not None:
                 break
 
@@ -159,6 +127,58 @@ class bittrex:
                 print(res['result']['buy'])
                 exit()
 
+    def get_market_history(self, currency_pair):
+        res = self.api_query_public('returnMarketHistory', {'currencyPair': currency_pair})
+
+        return res
+
+    def get_market_volatility(self, currency_pair):
+        res = self.get_market_history(currency_pair)
+        if res is not None:
+            history = res['result']
+
+
+            time0 = ts_2_s(history[0]['TimeStamp'])
+            prices = [h['Price'] for h in history if (time0 - ts_2_s(h['TimeStamp'])) < 100]
+            max_p = max(prices)
+            norm_prices = [p / max_p for p in prices]
+
+            sum_amount = sum([h['Quantity'] for h in history if (time0 - ts_2_s(h['TimeStamp'])) < 100])
+
+            avg_p = sum(norm_prices) / len(norm_prices)
+            vol = (sum((p - avg_p) ** 2 for p in norm_prices)) ** 0.5
+            return (vol, len(norm_prices), sum_amount)
+        else:
+            return None
+
+    # PRIVATE API FUNCTIONS
+    def api_query_private(self, method, options=None):
+        if not options:
+            options = {}
+        nonce = str(int(time.time() * 1000))
+
+        if method in MARKET_SET:
+            method_set = 'market'
+        elif method in ACCOUNT_SET:
+            method_set = 'account'
+
+        request_url = (BASE_URL % method_set) + method + '?'
+
+        request_url += 'apikey=' + self.api_key + "&nonce=" + nonce + '&'
+
+        request_url += urlencode(options)
+
+        try:
+            return requests.get(
+                request_url,
+                headers={"apisign": hmac.new(self.api_secret.encode(), request_url.encode(), hashlib.sha512).hexdigest()},
+                timeout=HTTP_TIMEOUT
+            ).json()
+
+        except:
+            log("ERROR CONNECTING TO EXCHANGE")
+            log(request_url)
+            return None
 
     def create_order(self, from_coin, to_coin, volume, price):
         currency_pair = "-".join([from_coin, to_coin])
@@ -187,18 +207,17 @@ class bittrex:
 
     def buy_limit(self, market, quantity, rate):
         log("{} {}".format('buylimit', {'market': market, 'quantity': quantity, 'rate': rate}))
-        return self.api_query1('buylimit', {'market': market, 'quantity': quantity, 'rate': rate})
+        return self.api_query_private('buylimit', {'market': market, 'quantity': quantity, 'rate': rate})
 
     def sell_limit(self, market, quantity, rate):
         log("{} {}".format('selllimit', {'market': market, 'quantity': quantity, 'rate': rate}))
-        return self.api_query1('selllimit', {'market': market, 'quantity': quantity, 'rate': rate})
+        return self.api_query_private('selllimit', {'market': market, 'quantity': quantity, 'rate': rate})
 
     def cancel_order(self, uuid):
         while True:
-            res = self.api_query1('cancel', {'uuid': uuid})
+            res = self.api_query_private('cancel', {'uuid': uuid})
             if res is not None:
                 break
-
 
         if res["success"]:
             return True
@@ -209,11 +228,11 @@ class bittrex:
 
 
     def get_open_orders(self, market):
-        return self.api_query('getopenorders', {'market': market})
+        return self.api_query_public('getopenorders', {'market': market})
 
     def get_order(self, uuid):
         while True:
-            order = self.api_query1('getorder', {'uuid': uuid})
+            order = self.api_query_private('getorder', {'uuid': uuid})
             if order is not None:
                 break
 
@@ -240,34 +259,29 @@ class bittrex:
 
         return amount_to
 
-    def get_market_history(self, currency_pair):
-        res = self.api_query('returnMarketHistory', {'currencyPair': currency_pair})
-
-        return res
-
-    def get_market_volatility(self, currency_pair):
-        res = self.get_market_history(currency_pair)
-        if res is not None:
-            history = res['result']
-
-
-            time0 = ts_2_s(history[0]['TimeStamp'])
-            prices = [h['Price'] for h in history if (time0 - ts_2_s(h['TimeStamp'])) < 100]
-            max_p = max(prices)
-            norm_prices = [p / max_p for p in prices]
-
-            sum_amount = sum([h['Quantity'] for h in history if (time0 - ts_2_s(h['TimeStamp'])) < 100])
-
-            avg_p = sum(norm_prices) / len(norm_prices)
-            vol = (sum((p - avg_p) ** 2 for p in norm_prices)) ** 0.5
-            return (vol, len(norm_prices), sum_amount)
-        else:
-            return None
 
     def get_balance(self, currency):
-        res = self.api_query1('getbalance', {'currency': currency})
+        res = self.api_query_private('getbalance', {'currency': currency})
 
         if res is not None:
             return res['result']['Balance']
         else:
             return None
+
+#
+    def get_ticket(self, from_coin, to_coin, interval='hour'):
+        currency_pair = "-".join([from_coin, to_coin])
+        if currency_pair not in self.direct_pairs:
+            currency_pair = "-".join([to_coin, from_coin])
+
+
+        try:
+            # https://bittrex.com/Api/v2.0/pub/market/GetTicks?marketName=USDT-BTC&tickInterval=day
+
+            ret = requests.get('https://bittrex.com/Api/v2.0/pub/market/GetTicks?marketName=' + currency_pair + '&tickInterval=' + interval, timeout=HTTP_TIMEOUT)
+
+            return ret.json()['result']
+        except:
+            print("|", end='')
+            return None
+

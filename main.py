@@ -4,6 +4,7 @@ import signal
 from multiprocessing import Pool
 
 from bittrex import bittrex
+from poloniex import poloniex
 from config import config
 from log import Log, DB
 
@@ -14,7 +15,7 @@ except ImportError:
         api_key = ""
         api_secret = ""
 
-AC2 = "BCC"
+AC2 = "XRP"
 '''
 New class candidates:
     
@@ -113,7 +114,7 @@ def sell_dust(dust):
 
 
 def dust2coin0(dust):
-    res = sum(convert(amount, from_coin=coin, to_coin=arbitrage_coins[0], fee=0, aggregation_volume=0) for (coin, amount) in dust.items())
+    res = sum(convert(amount, from_coin=coin, to_coin=arbitrage_coins[0]) for (coin, amount) in dust.items())
     return res
 
 
@@ -370,11 +371,22 @@ if __name__ == '__main__':
             arb1 = convert(convert(convert(config.test_vol, from_coin=arbitrage_coins[0], to_coin=arbitrage_coins[1]), from_coin=arbitrage_coins[1], to_coin=arbitrage_coins[2]), from_coin=arbitrage_coins[2], to_coin=arbitrage_coins[0]) - config.test_vol
             arb2 = convert(convert(convert(config.test_vol, from_coin=arbitrage_coins[0], to_coin=arbitrage_coins[2]), from_coin=arbitrage_coins[2], to_coin=arbitrage_coins[1]), from_coin=arbitrage_coins[1], to_coin=arbitrage_coins[0]) - config.test_vol
 
+            ac = arbitrage_coins
+            arb3 = convert(convert(config.trade_vol, from_coin=ac[0], to_coin=ac[1]), from_coin=ac[1], to_coin=ac[2]) - convert(config.test_vol, from_coin=ac[0], to_coin=ac[2]) # cheap ac[2]
+            arb4 = convert(convert(config.trade_vol, from_coin=ac[0], to_coin=ac[2]), from_coin=ac[2], to_coin=ac[1]) - convert(config.test_vol, from_coin=ac[0], to_coin=ac[1]) # cheap ac[1]
+
+            if arb3 > 0 :
+                log("CHEAP" + ac[2])
+
+            if arb4 > 0 :
+                log("CHEAP" + ac[1])
+
+
             if arb1 > 0 or arb2 > 0:
                 time_prev_arb = time()
 
                 arb_count += 1
-                log("\n\n====================")
+                log("====================")
                 log("ARBITRAGE DETECTED %d" % arb_count)
 
                 if arb2 > arb1:
@@ -398,7 +410,6 @@ if __name__ == '__main__':
                 amount_to_spend_ul0 = min(amount_onsale_from0_to1_as0, amount_onsale_from1_to2_as0, amount_onsale_from2_to0_as0)
 
                 V1 = amount_to_spend0
-                # WARNING: best (non-agregated) price is chosen
                 V3 = convert(convert(convert(V1, from_coin = arbitrage_coins[0], to_coin = arbitrage_coins[1]), from_coin = arbitrage_coins[1], to_coin = arbitrage_coins[2]), from_coin = arbitrage_coins[2], to_coin = arbitrage_coins[0])
                 expected_profit = (V3 - V1)
                 expected_profit_percent = (100 * (V3 / V1 - 1))
@@ -410,8 +421,7 @@ if __name__ == '__main__':
                 log("EXPECTED ARBITRAGE PROFIT,%%: %f %%" % expected_profit_percent)
 
                 # trade
-                if True:
-                    arb_stage_pass = 0
+                if config.trade:
                     # BUY
                     amount_to_buy1 = convert(amount_to_spend0, from_coin = arbitrage_coins[0], to_coin = arbitrage_coins[1], fee=0, aggregation_volume=get_agam(arbitrage_coins[0]))
                     amount_recieved1, usd_amount1, dust0 = try_buy(amount_to_buy1, from_coin = arbitrage_coins[0], to_coin = arbitrage_coins[1])
@@ -423,11 +433,19 @@ if __name__ == '__main__':
 
 
                     if (amount_recieved1 - get_min_trade(arbitrage_coins[1])) > 0:
-                        arb_stage_pass = 1
                         # SELL/BUY
                         amount_to_buy2 = convert(amount_recieved1, from_coin = arbitrage_coins[1], to_coin = arbitrage_coins[2], fee=0, aggregation_volume=get_agam(arbitrage_coins[1]))
                         amount_recieved2, usd_amount2, dust1 = try_buy(amount_to_buy2, from_coin = arbitrage_coins[1], to_coin = arbitrage_coins[2])
                         dust[arbitrage_coins[1]] += dust1
+
+                        # TODO: fix profit
+                        #dust[arbitrage_coins[1]] += (dust1, dust1_buyprice_usd)
+                        #in PL_check
+                        #      if dust[coin_i][i]*sell_price_usd > dust[coin_i][i]*dust1_buyprice_usd + config.dust_profit
+                        #      sold, unsold = market_sell(dust[coin_i][i])
+                        #      profit += sold
+                        #      if unsold > 0 : dust[coin_i][i] = (unsold, dust1_buyprice_usd): else: delete dust[coin_i][i]
+
 
                         if dust[arbitrage_coins[2]] > 0:
                             log("Adding %10.10f %s of dust" % (dust[arbitrage_coins[2]], arbitrage_coins[2]))
@@ -435,18 +453,16 @@ if __name__ == '__main__':
                             dust[arbitrage_coins[2]] = 0
 
                         if (amount_recieved2 - get_min_trade(arbitrage_coins[2])) > 0:
-                            arb_stage_pass = 2
                             #final_amount, dust2 = market_sell(amount_recieved2, from_coin = arbitrage_coins[2], to_coin = arbitrage_coins[0])
 
                             # SELL
                             amount_to_buy0 = convert(amount_recieved2, from_coin=arbitrage_coins[2], to_coin=arbitrage_coins[0], fee=0, aggregation_volume=get_agam(arbitrage_coins[2]))
                             final_amount, sink, dust2 = try_buy(amount_to_buy0, from_coin=arbitrage_coins[2],  to_coin=arbitrage_coins[0])
-
                             dust[arbitrage_coins[2]] += dust2
 
                             profit = final_amount + usd_amount1 + usd_amount2 - amount_to_spend0 * (1 + config.tx)
-
                             arb_stage_pass = 3
+
                             if profit > 0:
                                 log("+++PROFIT = %f" % (profit))
                                 profit_count += 1
@@ -458,6 +474,8 @@ if __name__ == '__main__':
                                 sum_loss += profit
 
                         else:
+                            arb_stage_pass = 2
+
                             dust2 = amount_recieved2
                             dust[arbitrage_coins[2]] += dust2
 
@@ -473,37 +491,50 @@ if __name__ == '__main__':
                         min_arb_execution_time = min(min_arb_execution_time, arb_execution_time)
                         max_arb_execution_time = max(max_arb_execution_time, arb_execution_time)
 
-                        vols = dict(zip(pairs, pool.map(exchange.get_market_volatility, pairs)))
-                        balances = dict(zip(arbitrage_coins, pool.map(exchange.get_balance, arbitrage_coins)))
 
                         log("***AVG P:%f, L:%f" % (sum_profit / profit_count, sum_loss / loss_count))
                         log("P:%d L:%d" % (profit_count, loss_count))
                         log("ARBITRAGE TOOK %f sec" % (arb_execution_time))
                         log("EXECUTION TIME: AVG %f sec, MIN %f sec, MAX %f sec" % (sum_arb_execution_time/(profit_count + loss_count), min_arb_execution_time, max_arb_execution_time))
-                        log(vols)
-                        log(balances)
 
                         log("")
 
-                        check_pl(sum_profit, sum_loss, dust)
 
                     else:
+                        arb_stage_pass = 1
+
                         dust1 = amount_recieved1
                         dust[arbitrage_coins[1]] += dust1
 
+                        profit = usd_amount1 - amount_to_spend0 * (1 + config.tx)
+                        log("---LOSS = %f" % profit)
+                        sum_loss += profit
+                        loss_count += 1
+
                         log(">>>")
 
-                    insert_data()
+                    check_pl(sum_profit, sum_loss, dust)
 
+                    vols = dict(zip(pairs, pool.map(exchange.get_market_volatility, pairs)))
+                    balances = dict(zip(arbitrage_coins, pool.map(exchange.get_balance, arbitrage_coins)))
+                    insert_data()
+                    log(balances)
 
 '''
+
 0. Fix convert(convert()) => Use actual position instead of desired position  
+
+1. create_order and cancel_order should not timeout i.e should know for sure what is outcome => use somme sort of  @replay_if_none 
+https://github.com/s4w3d0ff/python-poloniex/blob/master/poloniex/__init__.py
+
+1a. requests to exhange should be limited per sec => use somme sort of @limit(call_per_sec)
+https://gist.github.com/gregburek/1441055
 
 2. FAILED ARB could be fixed by simultaneous orders with some position in arb_coins
     Seems doesn't make much sense since it increases exposure to market <= requires open positions for indefinite time
 
 !4. 2DO: command line iface for research, i.e.: start.py EXCHANGE COIN1 COIN2 COIN3
-!5. 2DO: .csv or other output fmt for further analysis - freq of arb, size of arb(avg, max), freq of trades
++!5. 2DO: .csv or other output fmt for further analysis - freq of arb, size of arb(avg, max), freq of trades
     - may be db is better due to possible simultaneous run of scripts. this might imply use of MPQUEUE for logging, + logging thread which outs data into db
 
 8. SPEEDUP: avoid exchange roundtrip for remaining amount of order

@@ -9,12 +9,12 @@ def createTimeStamp(datestr, format="%Y-%m-%d %H:%M:%S"):
 
 
 class poloniex:
-    def __init__(self, APIKey, Secret):
+    def __init__(self, APIKey="", Secret=""):
         self.APIKey = APIKey
         self.Secret = Secret
 
         self.coin_separator = '_'
-        self.direct_pairs = ['USDT_BTC', 'BTC_ETH', 'USDT_ETH', 'USDT_ZEC', 'ETH_ZEC', 'BTC_XRP', 'USDT_XRP']
+        self.direct_pairs = ['USDT_BTC', 'BTC_ETH', 'USDT_ETH', 'USDT_ZEC', 'ETH_ZEC', 'BTC_XRP', 'USDT_XRP', 'BTC_BCH', 'USDT_BCH']
 
 
     def api_query(self, command, req={}):
@@ -41,22 +41,6 @@ class poloniex:
 
     def returnOrderBookCached(self, currencyPair):
         return self.quotes[currencyPair]
-
-    def order_book_top10(self, from_coin, to_coin):
-        # {'asks': [['2529.04989980', 100]], 'bids': [['2529.04989980', 200]]}
-
-        currency_pair = "_".join([from_coin, to_coin])
-        if currency_pair in self.direct_pairs:
-            res = self.returnOrderBook(currency_pair)
-            price, volume = res['asks'][0]
-            price = float(price)
-            return {'price': float(price), 'volume': volume}
-        else:
-            currency_pair = "_".join([to_coin, from_coin])
-            res = self.returnOrderBook(currency_pair)
-            price, volume = res['bids'][0]
-            price = float(price)
-            return {'price': 1.0 / price, 'volume': volume * price}
 
     def order_book_top1(self, from_coin, to_coin):
         # {'asks': [['2529.04989980', 100]], 'bids': [['2529.04989980', 200]]}
