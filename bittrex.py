@@ -17,12 +17,13 @@ log = Log()
 
 BASE_URL = 'https://bittrex.com/api/v1.1/%s/'
 
-MARKET_SET = {'getopenorders', 'cancel', 'sellmarket', 'selllimit', 'buymarket', 'buylimit'}
+MARKET_SET = {'getopenorders', 'cancel', 'sellmarket', 'selllimit', 'buymarket', 'buylimit', 'tradebuy', 'tradesell'}   # 'tradebuy', 'tradesell' are v2
 ACCOUNT_SET = {'getorder', 'getbalances', 'getbalance', 'getdepositaddress', 'withdraw', 'getorderhistory'}
 
 HTTP_TIMEOUT = 2
 # https://github.com/ericsomdahl/python-bittrex/blob/master/bittrex/bittrex.py
 # https://bittrex.com/home/api
+# https://github.com/mondeja/bittrex_v2/blob/master/bittrex_v2/bittrex.py
 
 def ts_2_s(ts):
     dot_ix = ts.find('.')
@@ -38,7 +39,7 @@ class bittrex:
         self.api_secret = str(api_secret) if api_secret is not None else ''
 
         self.coin_separator = '-'
-        self.direct_pairs = ['USDT-BTC', 'BTC-ETH', 'USDT-ETH', 'USDT-ZEC', 'ETH-ZEC', 'ETH-DASH', 'BTC-DASH', 'USDT-DASH', 'ETH-XRP', 'BTC-XRP', 'USDT-XRP', 'BTC-LTC', 'ETH-LTC', 'USDT-LTC', 'BTC-BCC', 'ETH-BCC', 'USDT-BCC', 'BTC-NEO','USDT-NEO', 'BTC-OMG','USDT-OMG' ]
+        self.direct_pairs = ['BTC-XMR', 'USDT-XMR', 'USDT-ZEC', 'BTC-ZEC', 'USDT-BTC', 'BTC-ETH', 'USDT-ETH', 'USDT-ZEC', 'ETH-ZEC', 'ETH-DASH', 'BTC-DASH', 'USDT-DASH', 'ETH-XRP', 'BTC-XRP', 'USDT-XRP', 'BTC-LTC', 'ETH-LTC', 'USDT-LTC', 'BTC-BCC', 'ETH-BCC', 'USDT-BCC', 'BTC-NEO','USDT-NEO', 'BTC-OMG','USDT-OMG' ]
         self.quotes = ['empty quotes']
         self.order_log = {}
 
@@ -51,7 +52,7 @@ class bittrex:
 
         if (command == "returnOrderBook"):
             try:
-                ret = requests.get('https://bittrex.com/api/v1.1/public/getorderbook?market=' + str(req['currencyPair'] + '&type=both'), timeout=HTTP_TIMEOUT)
+                ret = requests.get('https://bittrex.com/api/v1.1/public/getorderbook?market=' + str(req['currencyPair']) + '&type=both', timeout=HTTP_TIMEOUT)
 
                 return ret.json()
             except:
@@ -68,6 +69,7 @@ class bittrex:
         else:
             return ""
 
+
     def returnOrderBook(self, currencyPair):
         while True:
             res = self.api_query_public("returnOrderBook", {'currencyPair': currencyPair})
@@ -77,8 +79,10 @@ class bittrex:
         res['time'] = time.time()
         return res
 
+
     def returnOrderBookCached(self, currencyPair):
         return self.quotes[currencyPair]
+
 
     def order_book_aggregated_top1(self, from_coin, to_coin, min_trade, cached = True):
         if cached:
@@ -86,7 +90,7 @@ class bittrex:
         else:
             ob_func = self.returnOrderBook
 
-        currency_pair = "-".join([from_coin, to_coin])
+        currency_pair = self.coin_separator.join([from_coin, to_coin])
         if currency_pair in self.direct_pairs:
             res = ob_func(currency_pair)
             volume = 0
@@ -94,11 +98,9 @@ class bittrex:
             max_i = len(res['result']['sell'])
             while volume <= min_trade and i < max_i:
                 res1 = res['result']['sell'][i]
-                price = float(res1['Rate'])                 # 2DO: MAX price is used instead of WEIGHTED
+                price = float(res1['Rate'])
                 volume += float(res1['Quantity']) * price
                 i += 1
-
-            #if i > 1:print("aggregated %d orders, price changed from %f to %f" % (i, res['result']['sell'][0]['Rate'], price))
 
             try:
                 return {'price': price, 'volume': volume}       # usdt => eth : usdt-eth => price in usdt, volume in usdt
@@ -107,18 +109,16 @@ class bittrex:
                 print(res['result']['sell'])
                 exit()
         else:
-            currency_pair = "-".join([to_coin, from_coin])
+            currency_pair = self.coin_separator.join([to_coin, from_coin])
             res = ob_func(currency_pair)
             volume = 0
             i = 0
             max_i = len(res['result']['buy'])
             while volume <= min_trade  and i < max_i:
                 res1 = res['result']['buy'][i]
-                price = float(res1['Rate'])                # 2DO: MAX price is used instead of WEIGHTED
+                price = float(res1['Rate'])
                 volume += float(res1['Quantity'])
                 i += 1
-
-            #if i > 1:print("aggregated %d orders, price changed from %f to %f" % (i, 1/res['result']['buy'][0]['Rate'], 1/price))
 
             try:
                 return {'price': 1.0 / price, 'volume': volume} # eth => btc: btc-eth => price in eth, volume in eth
@@ -127,10 +127,12 @@ class bittrex:
                 print(res['result']['buy'])
                 exit()
 
+
     def get_market_history(self, currency_pair):
         res = self.api_query_public('returnMarketHistory', {'currencyPair': currency_pair})
 
         return res
+
 
     def get_market_volatility(self, currency_pair):
         res = self.get_market_history(currency_pair)
@@ -151,6 +153,7 @@ class bittrex:
         else:
             return None
 
+
     # PRIVATE API FUNCTIONS
     def api_query_private(self, method, options=None):
         if not options:
@@ -163,9 +166,7 @@ class bittrex:
             method_set = 'account'
 
         request_url = (BASE_URL % method_set) + method + '?'
-
         request_url += 'apikey=' + self.api_key + "&nonce=" + nonce + '&'
-
         request_url += urlencode(options)
 
         try:
@@ -180,38 +181,108 @@ class bittrex:
             log(request_url)
             return None
 
+
+    def api_query_private_v2(self, method, options=None):
+        BASE_URL2 = BASE_URL = 'https://bittrex.com/api/v2.0/auth/%s/'
+        if not options:
+            options = {}
+        nonce = str(int(time.time() * 1000))
+
+        if method in MARKET_SET:
+            method_set = 'market'
+        elif method in ACCOUNT_SET:
+            method_set = 'account'
+
+        request_url = (BASE_URL2 % method_set) + method + '?'
+        request_url += 'apikey=' + self.api_key + "&nonce=" + nonce + '&'
+        request_url += urlencode(options)
+
+        res =  requests.post(
+            request_url,
+            headers={"apisign": hmac.new(self.api_secret.encode(), request_url.encode(),
+                                         hashlib.sha512).hexdigest()},
+            timeout=HTTP_TIMEOUT
+        )
+        # TODO: fix error 500. check wrapper on git
+
+        try:
+            ...
+        except:
+            log("ERROR CONNECTING TO EXCHANGE")
+            log(request_url)
+            return None
+
+    # Ex.: place_order('SELL', 'USDT_BTC', 0.001, 16000, ordertype='CONDITIONAL', timeInEffect=GOOD_TIL_CANCELLED, conditionType="LESS_THAN", target=16001)
+    '''
+        MarketName:USDT-DASH
+        OrderType:LIMIT
+        Quantity:0.02352940
+        Rate:770.00000000
+        TimeInEffect:GOOD_TIL_CANCELLED
+        ConditionType:LESS_THAN
+        Target:771    
+    '''
+    def place_order(self, tradetype, market, amount, rate,
+                    ordertype, timeInEffect,
+                    conditionType=None, target=None):
+        """
+        Places a buy/sell order with specific conditions
+        (target only required if a condition is in place)
+        """
+
+        if tradetype in ('BUY', 'buy'):
+            method = "tradebuy"
+        elif tradetype in ('SELL', 'sell'):
+            method = "tradesell"
+
+        if not conditionType:
+            conditionType = "CONDITION_NONE"
+        if not target:
+            target = "0"
+
+        options = {"marketname": market,
+                   "ordertype": ordertype,
+                   "quantity": str(amount),
+                   "rate": str(rate),
+                   "timeineffect": str(timeInEffect),
+                   "conditiontype": conditionType,
+                   "target": target}
+
+        res = self.api_query_private_v2(method, options)
+
+    # PRIVATE API FUNCTIONS
     def create_order(self, from_coin, to_coin, volume, price):
-        currency_pair = "-".join([from_coin, to_coin])
+        currency_pair = self.coin_separator.join([from_coin, to_coin])
         if currency_pair in self.direct_pairs:
             res = self.buy_limit(currency_pair, volume, price)
 
         else:
-            currency_pair = "-".join([to_coin, from_coin])
+            currency_pair = self.coin_separator.join([to_coin, from_coin])
             rprice = 1 / price
             rvolume = volume * price
             res = self.sell_limit(currency_pair, rvolume, rprice)
 
-
         if res is not None and res["success"]:
             o_id = res["result"]["uuid"]
-
             # could also store actual amounts for further PL calculations, also time could be useful to benchmark ordr execution time, and freqs of arb ops
-            self.order_log[o_id] = {"CurrencyPair": "-".join([from_coin, to_coin])}
+            self.order_log[o_id] = {"CurrencyPair": self.coin_separator.join([from_coin, to_coin])}
 
             return o_id
         else:
             log(res)
-
             log("FAILED TO CREATE ORDER FOR CONVERSION FROM %s TO %f %s USING PRICE %f" % (from_coin, volume, to_coin, price))
             return -1
+
 
     def buy_limit(self, market, quantity, rate):
         log("{} {}".format('buylimit', {'market': market, 'quantity': quantity, 'rate': rate}))
         return self.api_query_private('buylimit', {'market': market, 'quantity': quantity, 'rate': rate})
 
+
     def sell_limit(self, market, quantity, rate):
         log("{} {}".format('selllimit', {'market': market, 'quantity': quantity, 'rate': rate}))
         return self.api_query_private('selllimit', {'market': market, 'quantity': quantity, 'rate': rate})
+
 
     def cancel_order(self, uuid):
         while True:
@@ -230,6 +301,7 @@ class bittrex:
     def get_open_orders(self, market):
         return self.api_query_public('getopenorders', {'market': market})
 
+
     def get_order(self, uuid):
         while True:
             order = self.api_query_private('getorder', {'uuid': uuid})
@@ -237,6 +309,7 @@ class bittrex:
                 break
 
         return order
+
 
     def is_order_open(self, uuid):
         order = self.get_order(uuid)
@@ -247,7 +320,7 @@ class bittrex:
         exchange_order = self.get_order(uuid)['result']
 
         logged_order = self.order_log[uuid]
-        currency_pair = logged_order ["CurrencyPair"]
+        currency_pair = logged_order["CurrencyPair"]
 
         if currency_pair in self.direct_pairs:
             amount_to = exchange_order["QuantityRemaining"]
@@ -270,10 +343,9 @@ class bittrex:
 
 #
     def get_ticket(self, from_coin, to_coin, interval='hour'):
-        currency_pair = "-".join([from_coin, to_coin])
+        currency_pair = self.coin_separator.join([from_coin, to_coin])
         if currency_pair not in self.direct_pairs:
-            currency_pair = "-".join([to_coin, from_coin])
-
+            currency_pair = self.coin_separator.join([to_coin, from_coin])
 
         try:
             # https://bittrex.com/Api/v2.0/pub/market/GetTicks?marketName=USDT-BTC&tickInterval=day

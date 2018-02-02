@@ -1,4 +1,10 @@
 from bittrex import bittrex
+from hitbtc import hitbtc
+
+exchange = hitbtc("", "")
+ob = exchange.order_book_aggregated_top1(from_coin='USD', to_coin='BTC', min_trade=10, cached = False)
+
+
 exchange = bittrex("", "")
 
 ob = exchange.order_book_aggregated_top1("USDT", "BTC", 1000000, cached = False)
@@ -8,7 +14,7 @@ ob = exchange.order_book_aggregated_top1("BTC", "USDT", 100, cached = False)
 print(ob)
 
 exit()
-# get 03.1 btc for X usd priced as 10 usd per btc
+# get 0.1 btc for X usd priced as 10 usd per btc
 order = exchange.create_order("USDT", "BTC", 0.1, 10)
 if not order:
     print("could not create an order")

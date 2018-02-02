@@ -4,7 +4,7 @@ from time import strftime, localtime
 class DB:
     def __init__(self):
         f_name = strftime("%Y_%m_%d_%H_%M_%S.csv", localtime())
-        self.f = open(f_name, 'w+')
+        self.f = open('logs/' + f_name, 'w+')
 
     def insert(self, data):
         self.f.write(','.join(str(x) for x in data) + '\n')
@@ -21,7 +21,7 @@ class Log:
     def __init__(self):
         if Log.f is None:
             f_name = strftime("%Y_%m_%d_%H_%M_%S.log", localtime())
-            Log.f = open(f_name, "w+")
+            Log.f = open('logs/' + f_name, "w+")
 
     def __call__(self, data):
         print(t(), data)
