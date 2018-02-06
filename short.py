@@ -1,6 +1,5 @@
 from bitfinex import bitfinex
 from keys import bitfinex_keys
-from config import config
 from trading_funcs import *
 import trading_funcs
 
@@ -8,12 +7,31 @@ exchange = bitfinex(bitfinex_keys.api_key, bitfinex_keys.api_secret)
 trading_funcs.exchange = exchange
 
 target_coin = 'ETH'
-trade_amount = 1800
+trade_amount = 500
+profit = 0.0025
+loss = 0.1
 
 amount_sell = convert(trade_amount, 'USD', target_coin )
 sell_price = get_price(from_coin='USD', to_coin=target_coin)
 
-buy_price = sell_price * (1 - 2 * config.tx - 0.0025)
+buy_price = sell_price * (1 - 2 * config.tx - profit)
 
-exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=sell_price, side='sell', type='market')
-exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=buy_price, side='buy', type='limit')      # or oco?
+print(exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=sell_price, side='sell', order_type='market'))
+
+if True:
+    print(exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=buy_price, side='buy', order_type='limit'))
+else:
+    bpo = sell_price * (1 + loss)
+    print(exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=buy_price, side='buy', order_type='limit', ocoorder=True, buy_price_oco=bpo))
+
+'''
+buy_price = 100.0
+bpo = 2000.0
+spo = 1000.0   # not used
+print(exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=buy_price, side='buy', order_type='limit', ocoorder=True, buy_price_oco=bpo, sell_price_oco=spo))
+
+sell_price = 1000.0
+bpo = 2000.0    #not used
+spo = 100.0
+print(exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=sell_price, side='sell', order_type='limit', ocoorder=True, buy_price_oco=bpo, sell_price_oco=spo))
+'''

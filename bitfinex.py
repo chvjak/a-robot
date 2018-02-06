@@ -177,14 +177,18 @@ class bitfinex:
 
 # ----------------------------------------------------------------------------------------------------------------------
 # marginal trading
-    def create_order(self, symbol, amount, price, side, type):
+    def create_order(self, symbol, amount, price, side, order_type, ocoorder=False, buy_price_oco=0.0, sell_price_oco=1000000.0):
         params = {
             'symbol': symbol,
             'amount': str(amount),
             'price': str(price),
             'exchange': 'bitfinex',
             'side': side,
-            'type': type
+            'type': order_type,
+            'is_hidden': True,
+            'ocoorder': ocoorder,
+            'buy_price_oco': str(buy_price_oco),
+            'sell_price_oco': str(sell_price_oco)
         }
 
         '''
