@@ -8,21 +8,23 @@ trading_funcs.exchange = exchange
 
 target_coin = 'ETH'
 trade_amount = 500
-profit = 0.0025
-loss = 0.1
+profit_percent = 0.0025
+loss_percent = 0.1
 
 amount_sell = convert(trade_amount, 'USD', target_coin )
 sell_price = get_price(from_coin='USD', to_coin=target_coin)
 
-buy_price = sell_price * (1 - 2 * config.tx - profit)
+buy_price = sell_price * (1 - 2 * config.tx - profit_percent)
 
-print(exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=sell_price, side='sell', order_type='market'))
+res = exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=sell_price, side='sell', order_type='market')
+print(res)
 
-if True:
-    print(exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=buy_price, side='buy', order_type='limit'))
-else:
-    bpo = sell_price * (1 + loss)
-    print(exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=buy_price, side='buy', order_type='limit', ocoorder=True, buy_price_oco=bpo))
+if 'id' in res.keys():
+    if True:
+        print(exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=buy_price, side='buy', order_type='limit'))
+    else:
+        bpo = sell_price * (1 + loss_percent)
+        print(exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=buy_price, side='buy', order_type='limit', ocoorder=True, buy_price_oco=bpo))
 
 '''
 buy_price = 100.0
