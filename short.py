@@ -19,7 +19,7 @@ sell_price = get_price(from_coin='USD', to_coin=target_coin)
 if True:
     res = exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=sell_price * 0.1, side='sell', order_type='limit', ocoorder=True, sell_price_oco=sell_price * (1 - config.tx / spread_fraction))
     print(res)
-    buy_price = sell_price * (1 - config.tx / spread_fraction - - config.tx / 2.0 - config.tx / 2.0 - profit_percent)
+    buy_price = sell_price * (1 - config.tx / spread_fraction - config.tx - config.tx / 2.0 - profit_percent)
 
 else:
     res = exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=sell_price, side='sell', order_type='market')

@@ -3,7 +3,7 @@ class config:
         max_exposure            = 50            # USD
         test_vol                = 600           # USD, not used?
         trade_vol               = 10             # USD, EXCHANGE?
-        tx                      = 0.0025        # %,    EXCHANGE
+        tx                      = 0.002        # %,    EXCHANGE
         min_trade_btc           = 0.0005        # BTC, EXCHANGE
         eps                     = 0.00000001
         max_loss                = -1            # USD

@@ -185,7 +185,7 @@ class bitfinex:
             'exchange': 'bitfinex',
             'side': side,
             'type': order_type,
-            'is_hidden': True,
+            'is_hidden': False,
             'ocoorder': ocoorder,
             'buy_price_oco': str(buy_price_oco),
             'sell_price_oco': str(sell_price_oco)
