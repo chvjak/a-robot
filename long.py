@@ -32,6 +32,7 @@ else:
 
 if 'id' in res.keys():
     if True:
+        #TODO: if order already executed adjust sell price to meet profit req
         '''
         {'message': 'Cannot evaluate your available balance, please try again'}
         {'id': 8037419156, 'cid': 48335225441, 'cid_date': '2018-02-07', 'gid': None, 'symbol': 'ethusd', 'exchange': 'bitfinex', 'price': '851.31', 'avg_execution_price': '0.0', 'side': 'sell', 'type': 'limit', 'timestamp': '1518009935.245941163', 'is_live': True, 'is_cancelled': False, 'is_hidden': True, 'oco_order': None, 'was_forced': False, 'original_amount': '1.1790362', 'remaining_amount': '1.1790362', 'executed_amount': '0.0', 'src': 'api', 'order_id': 8037419156}

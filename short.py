@@ -7,14 +7,18 @@ exchange = bitfinex(bitfinex_keys.api_key, bitfinex_keys.api_secret)
 trading_funcs.exchange = exchange
 
 target_coin = 'ETH'
-trade_amount = 1000
+trade_amount = 500
 profit_percent = 0.0012
 loss_percent = 0.1
-spread_fraction = 50.0
+spread_fraction = 20.0
 
 amount_sell = convert(trade_amount, 'USD', target_coin )
 sell_price = get_price(from_coin='USD', to_coin=target_coin)
+buy_price = sell_price * (1 - config.tx / spread_fraction - config.tx - config.tx / 2.0 - profit_percent)
 
+print('sell_price =', sell_price)
+print('buy_price =', buy_price )
+print('target price movement, % = ', (sell_price / buy_price - 1) * 100)
 
 if True:
     res = exchange.create_order(symbol=target_coin + 'USD', amount=amount_sell, price=sell_price * 0.1, side='sell', order_type='limit', ocoorder=True, sell_price_oco=sell_price * (1 - config.tx / spread_fraction))
